@@ -1,0 +1,15 @@
+{
+  "name": "aragon-scripts",
+  "version": "1.0.0",
+  "entry": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "eth-ens-namehash": "^2.0.8",
+    "eth-provider": "^0.2.5",
+    "ethers": "^4.0.47"
+  }
+}
