@@ -190,8 +190,12 @@ async function main() {
     );
 
     console.log('Initializing Token Manager');
-    const tokenManagerInitTx = await tokenManagerContract.initialize(minimeContract.address, true, '0');
-    await tokenManagerInitTx.wait()
+    const tokenManagerInitTx = await tokenManagerContract.initialize(
+      minimeContract.address,
+      true,
+      '0',
+    );
+    await tokenManagerInitTx.wait();
     console.log('Token Manager Initialized');
 
     console.log('Minting 1 tokens to dictator address');
@@ -364,7 +368,7 @@ async function main() {
   } catch (e) {
     console.log(e);
   } finally {
-    return;
+    process.exit();
   }
 }
 
