@@ -8,8 +8,10 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
+    "chalk": "^4.0.0",
     "eth-ens-namehash": "^2.0.8",
     "eth-provider": "^0.2.5",
-    "ethers": "^4.0.47"
+    "ethers": "^4.0.47",
+    "ora": "^4.0.4"
   }
 }

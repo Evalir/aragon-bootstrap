@@ -1,6 +1,8 @@
+const Chalk = require('chalk');
 const Ethers = require('ethers');
 const Namehash = require('eth-ens-namehash');
 const EthProvider = require('eth-provider');
+const Ora = require('ora');
 
 // ABIs
 const aclAbi = require('./abi/acl.json');
@@ -105,7 +107,9 @@ async function main() {
 
     // Account used to initialize permissions
     const dictatorAccount = (await ethersProvider.listAccounts())[0];
-    console.log(`Using ${dictatorAccount} as account for permissions`);
+    console.log(
+      Chalk.cyan(`Using ${dictatorAccount} as account for permissions`),
+    );
 
     const bareTemplateContract = new Ethers.Contract(
       BARE_TEMPLATE_ADDRESS,
@@ -115,7 +119,7 @@ async function main() {
 
     // Get the proper function we want to call; ethers will not get the overload
     // automatically, so we take the proper one from the object, and then call it.
-    console.log('Deploying Dao...');
+    const deploySpinner = Ora('Deploying Dao...').start();
     const tx = await bareTemplateContract['newInstance()']();
     // Filter and get the DAO address from the events.
     const daoAddress = await getDaoAddress(
@@ -123,8 +127,9 @@ async function main() {
       bareTemplateContract,
       tx.hash,
     );
+
     // Log the DAO Address
-    console.log('DAO Deployed:\n', daoAddress);
+    deploySpinner.succeed(`Dao Deployed: ${daoAddress}`);
     // Deploy a minime token for the organization
     // The token controller will be the sender
     const minimeFactory = new Ethers.ContractFactory(
@@ -132,7 +137,8 @@ async function main() {
       minimeBytecode.object,
       ethersSigner,
     );
-    console.log('Deploying minime token...');
+
+    const minimeSpinner = Ora('Deploying Minime Token...').start();
     const minimeContract = await minimeFactory.deploy(
       MINIME_FACTORY_ADDRESS,
       ZERO_ADDRESS,
@@ -142,6 +148,7 @@ async function main() {
       'TTH',
       true,
     );
+    minimeSpinner.succeed(`Minime Token Deployed ${minimeContract.address}`);
 
     // Instanciate the kernel contracto so we can get the ACL and install apps
     const kernelContract = new Ethers.Contract(
@@ -151,7 +158,9 @@ async function main() {
     );
     const aclAddress = await kernelContract.acl();
     const aclContract = new Ethers.Contract(aclAddress, aclAbi, ethersSigner);
-    console.log('Installing token manager');
+
+    const TokenManagerSpinner = Ora('Installing Token Manager...').start();
+
     const tokenManagerInstallTx = await kernelContract[
       'newAppInstance(bytes32,address)'
     ](TOKEN_MANAGER_APP_ID, TOKEN_MANAGER_IMPL_ADDRESS);
@@ -161,20 +170,13 @@ async function main() {
       kernelContract,
       tokenManagerInstallTx.hash,
     );
-    console.log('Token Manager Installed: \n', tokenManagerContractAddress);
-    console.log(
-      'Changing Minime Controller to token Manager address:',
-      tokenManagerContractAddress,
-    );
+
     // Making token manager controller of the minime token
     const changeControllerTx = await minimeContract.changeController(
       tokenManagerContractAddress,
     );
     await changeControllerTx.wait();
     // Creating a permission for MINT_ROLE on the ACL for token manager
-    console.log(
-      'Creating a permission for MINT_ROLE on the ACL for token manager',
-    );
 
     await aclContract.createPermission(
       dictatorAccount,
@@ -189,19 +191,20 @@ async function main() {
       ethersSigner,
     );
 
-    console.log('Initializing Token Manager');
     const tokenManagerInitTx = await tokenManagerContract.initialize(
       minimeContract.address,
       true,
       '0',
     );
     await tokenManagerInitTx.wait();
-    console.log('Token Manager Initialized');
 
-    console.log('Minting 1 tokens to dictator address');
     await tokenManagerContract.mint(dictatorAccount, bigNum(10).pow(18));
+    TokenManagerSpinner.succeed(
+      `Token Manager Initialized: ${tokenManagerContractAddress} and minted 1 token to dictator address.`,
+    );
+    //
     // Install a voting app
-    console.log('Installing Voting App...');
+    const votingAppSpinner = Ora('Installing Voting App').start();
     const votingInstallTx = await kernelContract[
       'newAppInstance(bytes32,address)'
     ](VOTING_APP_ID, VOTING_IMPL_ADDRESS);
@@ -211,7 +214,6 @@ async function main() {
       kernelContract,
       votingInstallTx.hash,
     );
-    console.log('Voting installed: \n', votingContractAddress);
 
     const votingContract = new Ethers.Contract(
       votingContractAddress,
@@ -219,7 +221,6 @@ async function main() {
       ethersSigner,
     );
 
-    console.log('Creating permission for token manager to create votes');
     await aclContract.createPermission(
       tokenManagerContractAddress,
       votingContractAddress,
@@ -234,10 +235,12 @@ async function main() {
       '86400',
     );
     await votingInitializeTx.wait();
-    console.log('Voting initialized: \n', votingContractAddress);
+
+    votingAppSpinner.succeed(`Voting app installed: ${votingContractAddress}`);
 
     // Install a vault app
-    console.log('Installing Vault App...');
+    const vaultAppSpinner = Ora('Installing Vault App').start();
+
     const vaultInstallTx = await kernelContract[
       'newAppInstance(bytes32,address)'
     ](VAULT_APP_ID, VAULT_IMPL_ADDRESS);
@@ -247,18 +250,17 @@ async function main() {
       kernelContract,
       vaultInstallTx.hash,
     );
-    console.log('Vault installed:\n', vaultContractAddress);
 
     const vaultContract = new Ethers.Contract(
       vaultContractAddress,
       vaultAbi,
       ethersSigner,
     );
-    console.log('Initializing Vault');
     await vaultContract.initialize();
-    console.log('Vault Initialized');
 
-    console.log('Installing Finance:');
+    vaultAppSpinner.succeed(`Vault app installed: ${vaultContractAddress}`);
+
+    const financeAppSpinner = Ora('Installing Finance').start();
     const financeInstallTx = await kernelContract[
       'newAppInstance(bytes32,address)'
     ](FINANCE_APP_ID, FINANCE_IMPL_ADDRESS);
@@ -268,10 +270,8 @@ async function main() {
       kernelContract,
       financeInstallTx.hash,
     );
-    console.log('Finance Installed:\n', financeContractAddress);
 
     // Creating a permission on Vault so finance can transfer tokens
-    console.log('Create permission on vault so finance can transfer tokens');
     await aclContract.createPermission(
       financeContractAddress,
       vaultContractAddress,
@@ -279,7 +279,6 @@ async function main() {
       votingContractAddress,
     );
 
-    console.log('Create permission on voting so finance can create payments');
     await aclContract.createPermission(
       votingContractAddress,
       financeContractAddress,
@@ -287,7 +286,6 @@ async function main() {
       votingContractAddress,
     );
 
-    console.log('Create permission on voting so finance can execute payments');
     await aclContract.createPermission(
       votingContractAddress,
       financeContractAddress,
@@ -295,7 +293,6 @@ async function main() {
       votingContractAddress,
     );
 
-    console.log('Create permission on voting so finance can manage payments');
     const lastFinancePermissionTx = await aclContract.createPermission(
       votingContractAddress,
       financeContractAddress,
@@ -310,11 +307,13 @@ async function main() {
       ethersSigner,
     );
 
-    console.log(
-      'Initializing finance, pointing the vault to the installed one, and \na period of 30 days',
-    );
     await financeContract.initialize(vaultContractAddress, '2592000');
-    console.log('Transferring admin permissions to Voting');
+    financeAppSpinner.succeed(
+      `Finance app installed: ${financeContractAddress}`,
+    );
+
+    const finishSpinner = Ora('Cleaning up spinner').start();
+
     await aclContract.grantPermission(
       votingContractAddress,
       tokenManagerContractAddress,
@@ -364,7 +363,9 @@ async function main() {
       aclContract.address,
       ACL_CREATE_PERMISSIONS_ROLE,
     );
-    console.log('DAO has been set up!');
+    finishSpinner.succeed(
+      `DAO has been setup!: https://rinkeby.aragon.org/#/${daoAddress}`,
+    );
   } catch (e) {
     console.log(e);
   } finally {
