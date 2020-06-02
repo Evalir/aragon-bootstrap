@@ -27,7 +27,7 @@ const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
 // IMPL_ADDRESS: The implementation address of the latest version deployed.
 // ..._ROLE: Roles defined in the app contract. An easy way to get these is just to use
 // https://emn178.github.io/online-tools/keccak_256.html
-// You can see the latest deployments on the deployments repo.
+// You can see the latest deployments on the repo below.
 // https://github.com/aragon/deployments/blob/master/environments/rinkeby/deploys.yml
 // NOTE: These correspond to the rinkeby network.
 // ACL
