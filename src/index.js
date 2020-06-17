@@ -150,7 +150,7 @@ async function main() {
     );
     minimeSpinner.succeed(`Minime Token Deployed ${minimeContract.address}`);
 
-    // Instanciate the kernel contracto so we can get the ACL and install apps
+    // Instanciate the kernel contract so we can get the ACL and install apps
     const kernelContract = new Ethers.Contract(
       daoAddress,
       kernelAbi,
